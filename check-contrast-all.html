@@ -29,13 +29,6 @@
     .legend-item { display: flex; align-items: center; gap: 5px; }
     .legend-dot { width: 14px; height: 14px; border-radius: 3px; }
 
-    /* note */
-    .note {
-      font-size: 11px; color: #555; background: #fff; border-left: 3px solid #7c3aed;
-      padding: 6px 10px; border-radius: 3px; margin-bottom: 14px; line-height: 1.6;
-    }
-    .note b { color: #7c3aed; }
-
     /* grid */
     .grid { display: flex; flex-wrap: wrap; gap: 6px; }
 
@@ -70,14 +63,12 @@
       font-size: 9px; font-weight: bold; width: 16px; flex-shrink: 0;
       opacity: 0.7;
     }
-    .cell-row-label.ch-label { color: #7c3aed; opacity: 1; }
     .cell-row-sample { font-size: 11px; font-weight: bold; flex: 1; text-align: center; }
     .cell-row-info { font-size: 9px; text-align: right; flex-shrink: 0; line-height: 1.3; }
     .pass { opacity: 1; }
     .fail { opacity: 0.75; }
     .badge-pass { color: #22c55e; font-weight: bold; }
     .badge-fail { color: #ef4444; font-weight: bold; }
-    .badge-same { font-size: 8px; color: #7c3aed; font-weight: bold; }
 
     .divider { height: 1px; background: rgba(0,0,0,0.15); margin: 0 4px; }
 
@@ -91,7 +82,7 @@
   </style>
 </head>
 <body>
-  <h1>もぎり 文字色ロジック 全サンプル比較（3ロジック）</h1>
+  <h1>もぎり 文字色ロジック 全サンプル比較（2ロジック）</h1>
   <p class="subtitle">
     入力: 画像平均色 (r,g,b) の代表サンプル (10段階 × 3ch = 1000色) &nbsp;|&nbsp;
     実効背景 = <code>img×0.93 + 17.85</code> (inner-contents α=0.3 → ticket-paper α=0.9)
@@ -109,12 +100,6 @@
     </div>
   </div>
 
-  <div class="note">
-    <b>ch (chroma)</b> は <code>chroma.mix(bottom, top, alpha, 'rgb')</code> + <code>chroma.contrast</code> の計算式をインライン再現。<br>
-    chroma は白/黒それぞれとのCRを比較して大きい方を選択。新ロジックは輝度 L &gt; 0.179 で分岐。<br>
-    数学的に等価なため、<b>全1000色で 新=ch</b> の一致を期待。不一致があれば実装バグのサインです。
-  </div>
-
   <div class="sort-bar">
     <label>並び替え: <select id="sortSel">
       <option value="cat">カテゴリ別</option>
@@ -124,7 +109,6 @@
       <option value="hue">色相順</option>
     </select></label>
     <span id="countLabel" style="color:#555"></span>
-    <span id="matchLabel" style="color:#7c3aed; font-weight:bold;"></span>
   </div>
 
   <div class="grid" id="grid"></div>
@@ -166,17 +150,6 @@ function newLogic(r, g, b) {
   return luminance(er, eg, eb) > 0.179 ? '#000000' : '#ffffff';
 }
 
-// chroma ロジック: 白/黒それぞれとの CR を比較して大きい方を選択
-// chroma.mix(bottom, top, alpha, 'rgb') → bottom*(1-alpha) + top*alpha = alphaOver(top, bottom, alpha)
-// chroma.contrast → WCAG コントラスト比。数学的に新ロジックと等価。
-function chromaLogic(r, g, b) {
-  const [er, eg, eb] = effectiveBg(r, g, b);
-  const L = luminance(er, eg, eb);
-  const crWhite = contrastRatio(L, 1.0); // vs #ffffff
-  const crBlack = contrastRatio(L, 0.0); // vs #000000
-  return crWhite >= crBlack ? '#ffffff' : '#000000';
-}
-
 // ─── サンプル生成 ─────────────────────────────────────────
 const STEPS = [0, 30, 60, 90, 120, 150, 180, 210, 240, 255];
 
@@ -186,19 +159,16 @@ for (const r of STEPS) for (const g of STEPS) for (const b of STEPS) {
   const [er, eg, eb] = eff;
   const L = luminance(er, eg, eb);
 
-  const oldC   = oldLogic(r, g, b);
-  const newC   = newLogic(r, g, b);
-  const chC    = chromaLogic(r, g, b);
+  const oldC  = oldLogic(r, g, b);
+  const newC  = newLogic(r, g, b);
 
-  const oldCR  = contrastRatio(L, oldC  === '#ffffff' ? 1.0 : 0.0);
-  const newCR  = contrastRatio(L, newC  === '#ffffff' ? 1.0 : 0.0);
-  const chCR   = contrastRatio(L, chC   === '#ffffff' ? 1.0 : 0.0);
+  const oldCR = contrastRatio(L, oldC === '#ffffff' ? 1.0 : 0.0);
+  const newCR = contrastRatio(L, newC === '#ffffff' ? 1.0 : 0.0);
 
   const oldPass = oldCR >= 4.5;
   const newPass = newCR >= 4.5;
-  const chPass  = chCR  >= 4.5;
 
-  // カテゴリ: 旧 vs 新 の比較が主軸
+  // カテゴリ: 旧 vs 新 の比較
   let cat;
   if (!oldPass && newPass)       cat = 'impr';
   else if (oldPass && newPass)   cat = 'both-p';
@@ -218,18 +188,12 @@ for (const r of STEPS) for (const g of STEPS) for (const b of STEPS) {
   const hex    = '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
   const effHex = '#' + eff.map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
 
-  samples.push({ r, g, b, hex, effHex, L,
-    oldC, newC, chC,
-    oldCR, newCR, chCR,
-    oldPass, newPass, chPass,
-    newChMatch: newC === chC,
-    cat, hue });
+  samples.push({ r, g, b, hex, effHex, L, oldC, newC, oldCR, newCR, oldPass, newPass, cat, hue });
 }
 
 // ─── 統計 ──────────────────────────────────────────────────
 const counts = { all: samples.length, impr: 0, 'both-p': 0, 'both-f': 0, worse: 0 };
 samples.forEach(s => counts[s.cat]++);
-const newChMismatchCount = samples.filter(s => !s.newChMatch).length;
 
 // ─── フィルタ・ソート状態 ─────────────────────────────────
 let activeFilter = 'all';
@@ -257,12 +221,6 @@ document.getElementById('sortSel').addEventListener('change', function() {
   activeSort = this.value; render();
 });
 
-// ─── 新=ch 一致状況 ──────────────────────────────────────
-document.getElementById('matchLabel').textContent =
-  newChMismatchCount === 0
-    ? `✓ 全${samples.length}色で 新=ch 一致`
-    : `⚠ 新≠ch の不一致: ${newChMismatchCount}色`;
-
 // ─── Render ────────────────────────────────────────────────
 const gridEl  = document.getElementById('grid');
 const countEl = document.getElementById('countLabel');
@@ -279,12 +237,11 @@ function sortedSamples(arr) {
   return s;
 }
 
-function makeRow(label, color, cr, pass, isChroma) {
+function makeRow(label, color, cr, pass) {
   const row = document.createElement('div');
   row.className = `cell-row ${pass ? 'pass' : 'fail'}`;
-  const labelCls = isChroma ? 'cell-row-label ch-label' : 'cell-row-label';
   row.innerHTML =
-    `<span class="${labelCls}">${label}</span>` +
+    `<span class="cell-row-label">${label}</span>` +
     `<span class="cell-row-sample" style="color:${color}">照合コード</span>` +
     `<span class="cell-row-info">${cr.toFixed(1)}:1<br>` +
     `<span class="${pass ? 'badge-pass' : 'badge-fail'}">${pass ? '✓AA' : '✗'}</span></span>`;
@@ -312,9 +269,6 @@ function render() {
     hdr.innerHTML =
       `<div class="cell-raw-dot" style="background:${s.hex}"></div>` +
       `<span class="cell-hex">${s.hex.toUpperCase()}</span>`;
-    if (!s.newChMatch) {
-      hdr.innerHTML += `<span style="margin-left:auto;color:#f0a;font-size:9px">新≠ch!</span>`;
-    }
     cell.appendChild(hdr);
 
     // body
@@ -322,11 +276,9 @@ function render() {
     body.className = 'cell-body';
     body.style.background = s.effHex;
 
-    body.appendChild(makeRow('旧', s.oldC, s.oldCR, s.oldPass, false));
+    body.appendChild(makeRow('旧', s.oldC, s.oldCR, s.oldPass));
     body.appendChild(Object.assign(document.createElement('div'), { className: 'divider' }));
-    body.appendChild(makeRow('新', s.newC, s.newCR, s.newPass, false));
-    body.appendChild(Object.assign(document.createElement('div'), { className: 'divider' }));
-    body.appendChild(makeRow('ch', s.chC,  s.chCR,  s.chPass,  true));
+    body.appendChild(makeRow('新', s.newC, s.newCR, s.newPass));
 
     cell.appendChild(body);
     frag.appendChild(cell);
