@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>もぎり 文字色ロジック 全サンプル比較</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f0f0f0; padding: 20px; color: #222; }
+    h1 { font-size: 18px; margin-bottom: 4px; }
+    .subtitle { font-size: 12px; color: #555; margin-bottom: 16px; }
+    code { font-family: monospace; background: #e8e8e8; padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+
+    /* summary */
+    .summary { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .summary-chip {
+      padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: bold;
+      cursor: pointer; border: 3px solid transparent; transition: border-color 0.15s;
+    }
+    .summary-chip.active { border-color: #111; }
+    .chip-all    { background: #ddd; color: #333; }
+    .chip-impr   { background: #f97316; color: #fff; }
+    .chip-both-p { background: #22c55e; color: #fff; }
+    .chip-both-f { background: #94a3b8; color: #fff; }
+    .chip-worse  { background: #ef4444; color: #fff; }
+
+    /* legend */
+    .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; font-size: 11px; }
+    .legend-item { display: flex; align-items: center; gap: 5px; }
+    .legend-dot { width: 14px; height: 14px; border-radius: 3px; }
+
+    /* note */
+    .note {
+      font-size: 11px; color: #555; background: #fff; border-left: 3px solid #7c3aed;
+      padding: 6px 10px; border-radius: 3px; margin-bottom: 14px; line-height: 1.6;
+    }
+    .note b { color: #7c3aed; }
+
+    /* grid */
+    .grid { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    /* cell */
+    .cell {
+      width: 140px; border-radius: 6px; overflow: hidden;
+      border: 3px solid #ccc;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    .cell.cat-impr   { border-color: #f97316; }
+    .cell.cat-both-p { border-color: #22c55e; }
+    .cell.cat-both-f { border-color: #94a3b8; }
+    .cell.cat-worse  { border-color: #ef4444; }
+
+    .cell-header {
+      display: flex; align-items: center; gap: 4px;
+      padding: 3px 5px; font-size: 9px; font-weight: bold;
+      background: rgba(0,0,0,0.45); color: #fff;
+    }
+    .cell-raw-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+      border: 1px solid rgba(255,255,255,0.5);
+    }
+    .cell-hex { letter-spacing: 0.03em; }
+
+    .cell-body { display: flex; flex-direction: column; }
+    .cell-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 3px 6px; font-size: 11px;
+    }
+    .cell-row-label {
+      font-size: 9px; font-weight: bold; width: 16px; flex-shrink: 0;
+      opacity: 0.7;
+    }
+    .cell-row-label.ch-label { color: #7c3aed; opacity: 1; }
+    .cell-row-sample { font-size: 11px; font-weight: bold; flex: 1; text-align: center; }
+    .cell-row-info { font-size: 9px; text-align: right; flex-shrink: 0; line-height: 1.3; }
+    .pass { opacity: 1; }
+    .fail { opacity: 0.75; }
+    .badge-pass { color: #22c55e; font-weight: bold; }
+    .badge-fail { color: #ef4444; font-weight: bold; }
+    .badge-same { font-size: 8px; color: #7c3aed; font-weight: bold; }
+
+    .divider { height: 1px; background: rgba(0,0,0,0.15); margin: 0 4px; }
+
+    .count-badge {
+      display: inline-block; padding: 1px 7px; border-radius: 10px;
+      font-size: 11px; background: rgba(0,0,0,0.2); margin-left: 4px;
+    }
+
+    .sort-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 12px; }
+    .sort-bar select { font-size: 12px; padding: 3px 6px; border-radius: 4px; border: 1px solid #ccc; }
+  </style>
+</head>
+<body>
+  <h1>もぎり 文字色ロジック 全サンプル比較（3ロジック）</h1>
+  <p class="subtitle">
+    入力: 画像平均色 (r,g,b) の代表サンプル (10段階 × 3ch = 1000色) &nbsp;|&nbsp;
+    実効背景 = <code>img×0.93 + 17.85</code> (inner-contents α=0.3 → ticket-paper α=0.9)
+  </p>
+
+  <div class="summary" id="summary"></div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div>旧×→新✓ 改善</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>旧✓ 新✓ 両方合格</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#94a3b8"></div>旧× 新× 両方不合格</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>旧✓→新× 悪化</div>
+    <div class="legend-item" style="margin-left:8px; color:#555">
+      ●=入力色 &nbsp;背景=実効色 &nbsp;CR = コントラスト比 (AA閾値: 4.5:1)
+    </div>
+  </div>
+
+  <div class="note">
+    <b>ch (chroma)</b> は <code>chroma.mix(bottom, top, alpha, 'rgb')</code> + <code>chroma.contrast</code> の計算式をインライン再現。<br>
+    chroma は白/黒それぞれとのCRを比較して大きい方を選択。新ロジックは輝度 L &gt; 0.179 で分岐。<br>
+    数学的に等価なため、<b>全1000色で 新=ch</b> の一致を期待。不一致があれば実装バグのサインです。
+  </div>
+
+  <div class="sort-bar">
+    <label>並び替え: <select id="sortSel">
+      <option value="cat">カテゴリ別</option>
+      <option value="cr-new-asc">新CR 昇順</option>
+      <option value="cr-new-desc">新CR 降順</option>
+      <option value="luminance">輝度順</option>
+      <option value="hue">色相順</option>
+    </select></label>
+    <span id="countLabel" style="color:#555"></span>
+    <span id="matchLabel" style="color:#7c3aed; font-weight:bold;"></span>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+<script>
+// ─── 計算コア ─────────────────────────────────────────────
+const ALPHA_IC = 0.3;  // inner-contents alpha
+const ALPHA_TP = 0.9;  // ticket-paper alpha
+
+function alphaOver(top, bot, a) { return top * a + bot * (1 - a); }
+
+function toLinear(c255) {
+  const c = c255 / 255;
+  return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
+function luminance(r, g, b) {
+  return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+}
+
+function contrastRatio(L1, L2) {
+  const hi = Math.max(L1, L2), lo = Math.min(L1, L2);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+function effectiveBg(r, g, b) {
+  const bg = [r, g, b].map(c => alphaOver(c, 255, ALPHA_IC));
+  return [r, g, b].map((c, i) => alphaOver(c, bg[i], ALPHA_TP));
+}
+
+// 旧ロジック: r+g+b の合計だけで判定（輝度重みなし）
+function oldLogic(r, g, b) {
+  return r + g + b > 382 ? '#000000' : '#ffffff';
+}
+
+// 新ロジック: WCAG 2.1 輝度 L > 0.179 で分岐
+function newLogic(r, g, b) {
+  const [er, eg, eb] = effectiveBg(r, g, b);
+  return luminance(er, eg, eb) > 0.179 ? '#000000' : '#ffffff';
+}
+
+// chroma ロジック: 白/黒それぞれとの CR を比較して大きい方を選択
+// chroma.mix(bottom, top, alpha, 'rgb') → bottom*(1-alpha) + top*alpha = alphaOver(top, bottom, alpha)
+// chroma.contrast → WCAG コントラスト比。数学的に新ロジックと等価。
+function chromaLogic(r, g, b) {
+  const [er, eg, eb] = effectiveBg(r, g, b);
+  const L = luminance(er, eg, eb);
+  const crWhite = contrastRatio(L, 1.0); // vs #ffffff
+  const crBlack = contrastRatio(L, 0.0); // vs #000000
+  return crWhite >= crBlack ? '#ffffff' : '#000000';
+}
+
+// ─── サンプル生成 ─────────────────────────────────────────
+const STEPS = [0, 30, 60, 90, 120, 150, 180, 210, 240, 255];
+
+const samples = [];
+for (const r of STEPS) for (const g of STEPS) for (const b of STEPS) {
+  const eff = effectiveBg(r, g, b);
+  const [er, eg, eb] = eff;
+  const L = luminance(er, eg, eb);
+
+  const oldC   = oldLogic(r, g, b);
+  const newC   = newLogic(r, g, b);
+  const chC    = chromaLogic(r, g, b);
+
+  const oldCR  = contrastRatio(L, oldC  === '#ffffff' ? 1.0 : 0.0);
+  const newCR  = contrastRatio(L, newC  === '#ffffff' ? 1.0 : 0.0);
+  const chCR   = contrastRatio(L, chC   === '#ffffff' ? 1.0 : 0.0);
+
+  const oldPass = oldCR >= 4.5;
+  const newPass = newCR >= 4.5;
+  const chPass  = chCR  >= 4.5;
+
+  // カテゴリ: 旧 vs 新 の比較が主軸
+  let cat;
+  if (!oldPass && newPass)       cat = 'impr';
+  else if (oldPass && newPass)   cat = 'both-p';
+  else if (!oldPass && !newPass) cat = 'both-f';
+  else                           cat = 'worse';
+
+  // 色相 (ソート用)
+  const maxC = Math.max(r, g, b), minC = Math.min(r, g, b), delta = maxC - minC;
+  let hue = 0;
+  if (delta > 0) {
+    if (maxC === r)      hue = 60 * (((g - b) / delta) % 6);
+    else if (maxC === g) hue = 60 * ((b - r) / delta + 2);
+    else                 hue = 60 * ((r - g) / delta + 4);
+    if (hue < 0) hue += 360;
+  }
+
+  const hex    = '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+  const effHex = '#' + eff.map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+
+  samples.push({ r, g, b, hex, effHex, L,
+    oldC, newC, chC,
+    oldCR, newCR, chCR,
+    oldPass, newPass, chPass,
+    newChMatch: newC === chC,
+    cat, hue });
+}
+
+// ─── 統計 ──────────────────────────────────────────────────
+const counts = { all: samples.length, impr: 0, 'both-p': 0, 'both-f': 0, worse: 0 };
+samples.forEach(s => counts[s.cat]++);
+const newChMismatchCount = samples.filter(s => !s.newChMatch).length;
+
+// ─── フィルタ・ソート状態 ─────────────────────────────────
+let activeFilter = 'all';
+let activeSort   = 'cat';
+
+// ─── Summary chips ──────────────────────────────────────────
+const summaryEl = document.getElementById('summary');
+const chipDefs = [
+  { key: 'all',    cls: 'chip-all',    label: '全て' },
+  { key: 'impr',   cls: 'chip-impr',   label: '旧×→新✓ 改善' },
+  { key: 'both-p', cls: 'chip-both-p', label: '旧✓ 新✓ 両方合格' },
+  { key: 'both-f', cls: 'chip-both-f', label: '旧× 新× 両方不合格' },
+  { key: 'worse',  cls: 'chip-worse',  label: '旧✓→新× 悪化' },
+];
+chipDefs.forEach(({ key, cls, label }) => {
+  const chip = document.createElement('div');
+  chip.className = `summary-chip ${cls}`;
+  chip.dataset.key = key;
+  chip.innerHTML = label + `<span class="count-badge">${key === 'all' ? counts.all : counts[key]}</span>`;
+  chip.addEventListener('click', () => { activeFilter = key; render(); });
+  summaryEl.appendChild(chip);
+});
+
+document.getElementById('sortSel').addEventListener('change', function() {
+  activeSort = this.value; render();
+});
+
+// ─── 新=ch 一致状況 ──────────────────────────────────────
+document.getElementById('matchLabel').textContent =
+  newChMismatchCount === 0
+    ? `✓ 全${samples.length}色で 新=ch 一致`
+    : `⚠ 新≠ch の不一致: ${newChMismatchCount}色`;
+
+// ─── Render ────────────────────────────────────────────────
+const gridEl  = document.getElementById('grid');
+const countEl = document.getElementById('countLabel');
+
+const CAT_ORDER = { impr: 0, 'both-p': 1, 'both-f': 2, worse: 3 };
+
+function sortedSamples(arr) {
+  const s = [...arr];
+  if      (activeSort === 'cat')          s.sort((a, b) => CAT_ORDER[a.cat] - CAT_ORDER[b.cat] || a.L - b.L);
+  else if (activeSort === 'cr-new-asc')   s.sort((a, b) => a.newCR - b.newCR);
+  else if (activeSort === 'cr-new-desc')  s.sort((a, b) => b.newCR - a.newCR);
+  else if (activeSort === 'luminance')    s.sort((a, b) => a.L - b.L);
+  else if (activeSort === 'hue')          s.sort((a, b) => a.hue - b.hue || a.L - b.L);
+  return s;
+}
+
+function makeRow(label, color, cr, pass, isChroma) {
+  const row = document.createElement('div');
+  row.className = `cell-row ${pass ? 'pass' : 'fail'}`;
+  const labelCls = isChroma ? 'cell-row-label ch-label' : 'cell-row-label';
+  row.innerHTML =
+    `<span class="${labelCls}">${label}</span>` +
+    `<span class="cell-row-sample" style="color:${color}">照合コード</span>` +
+    `<span class="cell-row-info">${cr.toFixed(1)}:1<br>` +
+    `<span class="${pass ? 'badge-pass' : 'badge-fail'}">${pass ? '✓AA' : '✗'}</span></span>`;
+  return row;
+}
+
+function render() {
+  document.querySelectorAll('.summary-chip').forEach(el =>
+    el.classList.toggle('active', el.dataset.key === activeFilter));
+
+  const visible = activeFilter === 'all' ? samples : samples.filter(s => s.cat === activeFilter);
+  const sorted  = sortedSamples(visible);
+  countEl.textContent = `${sorted.length}色 表示中  |`;
+
+  gridEl.innerHTML = '';
+  const frag = document.createDocumentFragment();
+
+  sorted.forEach(s => {
+    const cell = document.createElement('div');
+    cell.className = `cell cat-${s.cat}`;
+
+    // header
+    const hdr = document.createElement('div');
+    hdr.className = 'cell-header';
+    hdr.innerHTML =
+      `<div class="cell-raw-dot" style="background:${s.hex}"></div>` +
+      `<span class="cell-hex">${s.hex.toUpperCase()}</span>`;
+    if (!s.newChMatch) {
+      hdr.innerHTML += `<span style="margin-left:auto;color:#f0a;font-size:9px">新≠ch!</span>`;
+    }
+    cell.appendChild(hdr);
+
+    // body
+    const body = document.createElement('div');
+    body.className = 'cell-body';
+    body.style.background = s.effHex;
+
+    body.appendChild(makeRow('旧', s.oldC, s.oldCR, s.oldPass, false));
+    body.appendChild(Object.assign(document.createElement('div'), { className: 'divider' }));
+    body.appendChild(makeRow('新', s.newC, s.newCR, s.newPass, false));
+    body.appendChild(Object.assign(document.createElement('div'), { className: 'divider' }));
+    body.appendChild(makeRow('ch', s.chC,  s.chCR,  s.chPass,  true));
+
+    cell.appendChild(body);
+    frag.appendChild(cell);
+  });
+
+  gridEl.appendChild(frag);
+}
+
+render();
+</script>
+</body>
+</html>
